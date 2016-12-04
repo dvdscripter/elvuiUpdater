@@ -1,0 +1,6 @@
+{
+"versionselector": "#wrapper > table:nth-child(10) > tbody:nth-child(1) > tr:nth-child(2) > th:nth-child(3) > span:nth-child(4)",
+"page": "http://www.tukui.org/dl.php",
+"addon": "C:/Program Files (x86)/World of Warcraft/Interface/AddOns",
+"directories": ["ElvUI", "ElvUI_Config"]
+}
