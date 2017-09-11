@@ -168,5 +168,7 @@ func main() {
 	} else {
 		log.Println("Nothing to do")
 	}
-
+	
+	log.Println("Press 'Enter' to finish...")
+	bufio.NewReader(os.Stdin).ReadBytes('\n')
 }
