@@ -1,6 +1,5 @@
 {
 "versionselector": "a.btn:nth-child(3) > span:nth-child(1)",
 "page": "https://www.tukui.org/welcome.php",
-"addon": "C:/Program Files (x86)/World of Warcraft/Interface/AddOns",
 "directories": ["ElvUI", "ElvUI_Config"]
 }

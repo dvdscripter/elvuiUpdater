@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/sys/windows/registry"
+
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -22,7 +24,7 @@ type configuration struct {
 	Versionselector string
 	Page            string
 	Directories     []string
-	Addon           string
+	addon           string
 }
 
 type elvui struct {
@@ -37,7 +39,23 @@ func (e *elvui) init(configPath string) error {
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(rawConfig, e)
+	if err = json.Unmarshal(rawConfig, e); err != nil {
+		return err
+	}
+
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Wow6432Node\Blizzard Entertainment\World of Warcraft`, registry.QUERY_VALUE)
+	if err != nil {
+		return err
+	}
+	defer k.Close()
+
+	s, _, err := k.GetStringValue("InstallPath")
+	if err != nil {
+		return err
+	}
+	e.addon = filepath.Join(s, "Interface", "AddOns")
+
+	return nil
 }
 
 func (e *elvui) getRemoteVersion() error {
@@ -61,7 +79,7 @@ func (e *elvui) getRemoteVersion() error {
 
 func (e *elvui) getLocalVersion() error {
 	prefix := "## Version: "
-	tocFile := filepath.Join(e.Addon, e.localName, e.localName+".toc")
+	tocFile := filepath.Join(e.addon, e.localName, e.localName+".toc")
 
 	toc, err := os.Open(tocFile)
 	if err != nil {
@@ -112,14 +130,14 @@ func (e elvui) downloadAndExtract() error {
 
 	// remove older directories
 	for _, dir := range e.Directories {
-		if err := os.RemoveAll(filepath.Join(e.Addon, dir)); err != nil {
+		if err := os.RemoveAll(filepath.Join(e.addon, dir)); err != nil {
 			return err
 		}
 	}
 
 	for _, f := range zipReader.File {
 		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(filepath.Join(e.Addon, f.Name), f.Mode()); err != nil {
+			if err := os.MkdirAll(filepath.Join(e.addon, f.Name), f.Mode()); err != nil {
 				return err
 			}
 		} else {
@@ -129,7 +147,7 @@ func (e elvui) downloadAndExtract() error {
 				return err
 			}
 			// create local file
-			fileLocal, err := os.Create(filepath.Join(e.Addon, f.Name))
+			fileLocal, err := os.Create(filepath.Join(e.addon, f.Name))
 			if err != nil {
 				return err
 			}
@@ -168,7 +186,7 @@ func main() {
 	} else {
 		log.Println("Nothing to do")
 	}
-	
+
 	log.Println("Press 'Enter' to finish...")
 	bufio.NewReader(os.Stdin).ReadBytes('\n')
 }
