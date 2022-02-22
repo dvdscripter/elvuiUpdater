@@ -80,7 +80,7 @@ func (e *elvui) getRemoteVersion() error {
 
 func (e *elvui) getLocalVersion() error {
 	prefix := "## Version: "
-	tocFile := filepath.Join(e.addon, e.localName, e.localName+".toc")
+	tocFile := filepath.Join(e.addon, e.localName, e.localName+"_Mainline.toc")
 
 	toc, err := os.Open(tocFile)
 	if err != nil {
