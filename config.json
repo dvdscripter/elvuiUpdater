@@ -1,5 +1,4 @@
 {
-"versionselector": "a.btn:nth-child(3) > span:nth-child(1)",
-"page": "https://www.tukui.org/welcome.php",
-"directories": ["ElvUI", "ElvUI_Config"]
+"page": "https://api.tukui.org/v1/addon/elvui",
+"directories": ["ElvUI", "ElvUI_Config", "ElvUI_Libraries"]
 }

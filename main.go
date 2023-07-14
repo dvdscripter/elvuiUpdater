@@ -5,7 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
+	"flag"
 	"io"
 	"io/ioutil"
 	"log"
@@ -14,25 +14,31 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
-	"golang.org/x/sys/windows/registry"
-
-	"github.com/PuerkitoBio/goquery"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/windows/registry"
 )
 
+type APIResponse struct {
+	URL     string `json:"url"`
+	Version string `json:"version"`
+}
+
 type configuration struct {
-	Versionselector string
-	Page            string
-	Directories     []string
-	addon           string
+	Page        string
+	Directories []string
+	addon       string
 }
 
 type elvui struct {
 	configuration
+	client       *http.Client
+	localVersion float64
+	localName    string
+
 	remoteVersion float64
-	localVersion  float64
-	localName     string
+	downloadURL   string
 }
 
 func (e *elvui) init(configPath string) error {
@@ -59,21 +65,27 @@ func (e *elvui) init(configPath string) error {
 	return nil
 }
 
-func (e *elvui) getRemoteVersion() error {
-	doc, err := goquery.NewDocument(e.Page)
+func (e *elvui) setRemoteVersionNDownloadURL() error {
+	req, err := http.NewRequest(http.MethodGet, e.Page, nil)
 	if err != nil {
-		return errors.Wrapf(err, "cannot parse url: %s", e.Page)
+		return errors.WithStack(err)
 	}
 
-	sel := doc.Find(e.Versionselector)
-	if sel == nil {
-		return errors.Errorf("version not found at %s", e.Page)
+	resp, err := e.client.Do(req)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	defer resp.Body.Close()
+
+	apiResponse := &APIResponse{}
+	if err := json.NewDecoder(resp.Body).Decode(apiResponse); err != nil {
+		return errors.WithStack(err)
 	}
 
-	span := strings.TrimSpace(sel.Text())
-	if e.remoteVersion, err = strconv.ParseFloat(span, 64); err != nil {
-		return errors.Wrapf(err, "cannot parse version number %s", span)
+	if e.remoteVersion, err = strconv.ParseFloat(apiResponse.Version, 64); err != nil {
+		return errors.Wrapf(err, "cannot parse version number %s", apiResponse.Version)
 	}
+	e.downloadURL = apiResponse.URL
 
 	return nil
 }
@@ -110,12 +122,9 @@ func (e *elvui) getLocalVersion() error {
 }
 
 func (e elvui) downloadAndExtract() error {
-	dlLink := fmt.Sprintf("http://www.tukui.org/downloads/%s-%.2f.zip",
-		strings.ToLower(e.localName), e.remoteVersion)
-
-	response, err := http.Get(dlLink)
+	response, err := http.Get(e.downloadURL)
 	if err != nil {
-		return errors.Wrapf(err, "cannot download file url %s", dlLink)
+		return errors.Wrapf(err, "cannot download file url %s", e.downloadURL)
 	}
 	defer response.Body.Close()
 	// hope tukui don't overflow my memory
@@ -171,7 +180,10 @@ func (e elvui) downloadAndExtract() error {
 }
 
 func main() {
-	conf := elvui{localName: "ElvUI"}
+	quiet := flag.Bool("quiet", false, "don't pause at the end of execution")
+	flag.Parse()
+
+	conf := elvui{localName: "ElvUI", client: &http.Client{Timeout: 5 * time.Second}}
 	if err := conf.init("config.json"); err != nil {
 		log.Fatalf("Fatal: %+v\n", err)
 	}
@@ -179,7 +191,7 @@ func main() {
 	if err := conf.getLocalVersion(); err != nil {
 		log.Fatalf("Fatal: %+v\n", err)
 	}
-	if err := conf.getRemoteVersion(); err != nil {
+	if err := conf.setRemoteVersionNDownloadURL(); err != nil {
 		log.Fatalf("Fatal: %+v\n", err)
 	}
 	if conf.remoteVersion > conf.localVersion {
@@ -190,6 +202,10 @@ func main() {
 		log.Println("Success")
 	} else {
 		log.Println("Nothing to do")
+	}
+
+	if *quiet {
+		return
 	}
 
 	log.Println("Press 'Enter' to finish...")
